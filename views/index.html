@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" ng-app="cmsApp">
+	<head>
+		<title>Content management system for creating Json files</title>
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.3/angular.min.js"></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/json2/20140204/json2.min.js"></script>
+		<script src="http://code.angularjs.org/1.3.3/angular-sanitize.js"></script>
+		<script src="js/jquery.min.js"></script>
+		<script src="js/jquery-textrange.js"></script>
+		<style>
+		body {
+			background: #000;
+		}
+		.framed {
+			margin-top: 20px;
+			margin-bottom: 20px;
+			border:3px solid #000;
+			padding-bottom: 20px;
+			background: #fff;
+		}
+		#editor {
+			padding-top:20px;
+		}
+		</style>
+		
+	</head>
+	<body ng-controller="AddController">
+		<section class="col-xs-6">			
+			<div id="editor" class="framed col-xs-12">
+			<form>
+				<div class="form-group">
+					<label for="article-author">Author: </label>
+					<input class="form-control" name="article-author" ng-model="article.author" placeholder="Name" />
+				</div>
+				<div class="form-group">
+					<label for="article-title">Title: </label>
+					<input class="form-control" name="article-title" ng-model="article.title" placeholder="Insert title here" />
+				</div>
+				<div class="form-group">
+					<label for="article-text">Contents: </label>
+					<textarea id="contents" class="form-control"  name="article-text" ng-change="changed()" ng-click="changed()" ng-model="article.text" placeholder="Insert text here"></textarea>
+				</div>
+				<button ng-click="addElement('<p>','</p>')">&para;</button>
+				<button ng-click="addElement('<strong>','</strong>')"><strong>strong</strong></button>
+				<button ng-click="addElement('<em>','</em>')"><em>em</em></button>
+				<button ng-click="addElement('<ul>','</ul>')">List</button>
+				<button ng-click="addElement('<li>','</li>')">List item</button>
+				<button ng-click="addElement('<br />')">New line</button>
+				<button ng-click="addElement('<img src= />')">Image</button><br/><br/>
+				<button ng-click="saveArticle()">Save</button>
+				<button ng-click="newArticle()">New article</button>
+			</form>
+			</div>
+			
+			<div class="framed col-xs-12">
+				<img >
+			</div>
+			<div class="framed col-xs-12">
+				<h1 ng-bind="article.title"></h1>
+				<h4>By <span ng-bind="article.author"></span></h4>
+				<p ng-bind-html="article.text">test</p>
+				<small>Created on <span ng-bind="article.created | date:formatDate"></span></small>			
+				<span ng-bind="article._id"></span>
+			</div>
+			
+		</section>
+		
+		<section class="articles col-xs-6">
+			<article ng-repeat="item in articles track by item._id">
+				<div class="framed col-xs-10 col-xs-offset-1">
+					<h1 ng-bind="item.title">Title</h1>
+					<h4>By <span ng-bind="item.author"></span></h4>
+					<p ng-bind-html="item.text">Text</p>
+					<small>
+						Created on <span ng-bind="item.created | date:formatDate"></span>.
+						Last edited on <span ng-bind="item.lastModified |  date:formatDate"></span>.<br/>						
+					</small>
+					<button ng-click="editArticle(item)">Edit</button>
+					<button ng-click="delArticle(item)">Delete</button>
+					<small>Id: <span ng-bind="item._id"></span></small>
+				</div>
+			</article>
+		</section>	
+		
+		<script>
+			
+			String.prototype.splice = function( idx, rem, s ) {
+				return (this.slice(0,idx) + s + this.slice(idx + rem));
+			};
+						
+			var cmsApp = angular.module('cmsApp', ['ngSanitize']);
+			
+			cmsApp.controller("AddController", function ($scope, $http) {
+				$scope.formatDate = "dd.MM.yyyy; HH:mm:ss";
+				$scope.article = {author:"Nightowl",text:"asd",title:"adda"};
+				$http.get('/articles').success(function (data) { 
+					$scope.articles = data; 
+				});
+				$scope.textInfo = {};				
+							
+				$scope.addElement = function(str1, str2) {
+				    if (str2){
+						$scope.article.text = $scope.article.text.splice($scope.textInfo.end, 0, str2);
+						$scope.article.text = $scope.article.text.splice($scope.textInfo.start, 0, str1);
+					} else {
+						$scope.article.text = $scope.article.text.splice($scope.textInfo.start, 0, str1);						
+					}
+				}
+				
+				$scope.changed = function() {
+					$scope.textInfo = $('#contents').textrange('get');
+				}
+				
+				$scope.saveArticle = function () {
+					$http({
+						method : 'post',
+						url : '/post',
+						data : $scope.article
+					}).success(function (data) {	
+						$scope.articles = data;
+						if (!($scope.article._id)) $scope.editArticle(data[data.length - 1]);
+					});
+				};
+				
+				$scope.delArticle = function (article){
+					$http.post('/delete', JSON.stringify(article)).success(function(data){
+						$scope.articles = data;
+					});
+				}
+				
+				$scope.editArticle = function (article){
+					$scope.article._id = article._id;
+					$scope.article.author = article.author;
+					$scope.article.title = article.title;
+					$scope.article.text = article.text;
+					$scope.article.created = article.created;
+					$scope.article.lastEdited = article.lastEdited;
+				}
+				
+				$scope.newArticle = function(){
+					$scope.article = {author:"",text:"",title:""};
+				}
+				
+				$scope.getCount = function() {
+					return $scope.articles.length;
+				};
+			});
+			
+			cmsApp.$inject = ['$scope', '$http'];
+			
+		</script>
+		
+	</body>
+</html>
